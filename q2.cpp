@@ -6,7 +6,7 @@
 #include <random> 
 #include <ctime>
 #include <sys/wait.h>
-
+#include <cstring>
 using namespace std; 
 #define SIZE 4
 #define NO_THREADS 4
@@ -34,13 +34,16 @@ public:
     void print_xi_matrix();
     void print_resultant_matrix_of_add(); 
     void print_bias_matrix(); 
+    void serialize_resultant_matrix_mul(char str[200]); 
 };
 
-mat_mult* matrix_mult_obj = new mat_mult; 
 
 
 int main()
 {
+    mat_mult* matrix_mult_obj = new mat_mult; 
+    int fd[2]; 
+    pipe(fd); 
     srand(time(0)); 
     pid_t pids[3]; //for P1, P2, P3
     typedef void* (*THREADFUNCPTR) (void* ); 
@@ -79,14 +82,27 @@ int main()
         std:: cout << "Printing the resultant matrix after Multiplication " << std::endl; 
         matrix_mult_obj->print_resultant_matrix_of_mul(); 
         std::cout << std::endl; 
-        
 
+        //serializing the resultant matrix to send over the pipe; 
+        string serialized_string_mul; 
+        char read_write_char[200]; 
+        matrix_mult_obj->serialize_resultant_matrix_mul(read_write_char); 
+
+        //writing the resultant matrix after multiplication into pipe so p2 can read it . 
+        close(fd[0]); 
+        read_write_char[strlen(read_write_char) - 1] = '\0';
+        int n  = strlen(read_write_char) + 1; 
+        write(fd[1], &n, sizeof(int));  
+        write(fd[1], read_write_char, sizeof(char) *n); 
+        close(fd[1]); 
+        
         exit(0); 
     }
     else 
     {  
         
         wait(NULL); 
+         
         //-----------Representing P2------------
         if ((pids[1] = fork()) == 0)
         {
@@ -108,9 +124,15 @@ int main()
             for (auto& exit:threads)
                 pthread_join(exit, NULL); 
 
-            // std:: cout << "Printing the resultant matrix after Multiplication " << std::endl; 
-            // matrix_mult_obj->print_resultant_matrix_of_mul(); 
-            // std::cout << std::endl; 
+             
+            char read_write_char[200]; 
+            close(fd[1]);
+            int n; 
+            read(fd[0], &n, sizeof(int)); 
+            read(fd[0], read_write_char, sizeof(char)* n); 
+            close(fd[0]);
+
+            
 
             std::cout << "Printing the bias matrix " << std::endl; 
             matrix_mult_obj->print_bias_matrix(); 
@@ -290,4 +312,27 @@ void mat_mult::print_bias_matrix()
             std::cout << bias_matrix[i][j] << " ";
         std::cout << std::endl; 
     }
+}
+
+void mat_mult::serialize_resultant_matrix_mul(char str[200])
+{
+/*
+SUMMARY 
+    Function of the class: mat_mult
+    PURPOSE: This funciton is used in the child process p1 (where multiplication of
+    weight matrix and xi matrix happens). Now when the child process works on a instance 
+    of the class object mat_mult after exiting all the values that it updated in the instance are destroyed
+    so i have to use pipes to serialize the resultant matrix calculated with that process 
+    convert into string and send via pipe so p2 can read it and use it. 
+*/
+    string return_str; 
+    for (auto i =0; i < SIZE; i++)
+    {
+        for(auto j = 0; j < SIZE; j++)
+        {
+            return_str += to_string(resultant_matrix_mul[i][j]); 
+            return_str += " "; 
+        }
+    }
+    strcpy(str, return_str.c_str()); 
 }
