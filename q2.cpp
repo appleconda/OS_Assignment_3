@@ -5,8 +5,7 @@
 #include <iostream> 
 #include <random> 
 #include <ctime>
-
-
+#include <sys/wait.h>
 
 using namespace std; 
 #define SIZE 4
@@ -57,30 +56,42 @@ public:
 
 int main()
 {
-    typedef void* (*THREADFUNCPTR) (void* ); 
-    mat_mult* matrix_mult_obj = new mat_mult; 
-    pthread_t threads[NO_THREADS]; 
-    int rtn(0); 
-    for (auto i = 0; i < NO_THREADS; i++)
+    pid_t pids[3]; //for P1, P2, P3
+
+    if((pids[0]=fork()) == 0)
     {
-        if (rtn = pthread_create(&threads[i], NULL, (THREADFUNCPTR) &mat_mult::multiply, matrix_mult_obj))
+        typedef void* (*THREADFUNCPTR) (void* ); 
+        mat_mult* matrix_mult_obj = new mat_mult; 
+        pthread_t threads[NO_THREADS]; 
+        int rtn(0); 
+        for (auto i = 0; i < NO_THREADS; i++)
         {
-            fprintf(stderr, "error: Pthread_create, "); 
-            if (rtn == EAGAIN)
-                fprintf(stderr, "insufficient resources "); 
-            else if(rtn == EINVAL)
-                fprintf (stderr, "Invalid Arguments"); 
-            exit(1); 
-         }
-    }
+            if (rtn = pthread_create(&threads[i], NULL, (THREADFUNCPTR) &mat_mult::multiply, matrix_mult_obj))
+            {
+                fprintf(stderr, "Error: Pthread_create, "); 
+                if (rtn == EAGAIN)
+                    fprintf(stderr, "Insufficient resources "); 
+                else if(rtn == EINVAL)
+                    fprintf (stderr, "Invalid Arguments"); 
+                exit(1); 
+            }
+        }
 
-    for (auto i = 0;i < NO_THREADS; i++)
-    {
-        
-        pthread_join(threads[i], NULL); 
-    }
+        for (auto i = 0;i < NO_THREADS; i++)
+        {
+            
+            pthread_join(threads[i], NULL); 
+        }
 
-    matrix_mult_obj->print_resultant_matrix(); 
+        matrix_mult_obj->print_resultant_matrix(); 
+        exit(0); 
+    }
+    else 
+    {  
+        wait(NULL); 
+
+    }
+   
 
     return 0;
 }
@@ -91,6 +102,4 @@ void* mat_mult::multiply()
     for (int j = 0; j < SIZE; j++)
       for (int k = 0; k < SIZE; k++)
         resultant_matrix[i][j] += weight_matrix[i][k] * x_i_matrix[k][j];
-    
-    
 }
