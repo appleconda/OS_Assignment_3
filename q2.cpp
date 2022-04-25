@@ -5,8 +5,11 @@
 #include <iostream> 
 #include <random> 
 #include <ctime>
+#include <sstream> 
 #include <sys/wait.h>
+#include <vector> 
 #include <cstring>
+
 using namespace std; 
 #define SIZE 4
 #define NO_THREADS 4
@@ -14,21 +17,23 @@ using namespace std;
 
 pthread_mutex_t global_data_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+int* tokenizer(const string& str, int&); 
+
 class mat_mult //function object class to pass into the thread
 {
 public: 
-    float weight_matrix[SIZE][SIZE];
-    float x_i_matrix[SIZE][SIZE];  
-    float resultant_matrix_mul[SIZE][SIZE]; 
-    float resultant_matrix_add[SIZE][SIZE]; 
-    float** bias_matrix;  
+    int weight_matrix[SIZE][SIZE];
+    int x_i_matrix[SIZE][SIZE];  
+    int resultant_matrix_mul[SIZE][SIZE]; 
+    int resultant_matrix_add[SIZE][SIZE]; 
+    int** bias_matrix;  
     int step_for_multiply;
     int step_for_additon; 
 
     mat_mult(); //constructor initiliazes matrix with random values 
     void init_bias_matrix();
     void* multiply();  
-    void* addition(); 
+    void* addition(int *); 
     void print_resultant_matrix_of_mul(); 
     void print_weight_matrix(); 
     void print_xi_matrix();
@@ -42,6 +47,7 @@ public:
 int main()
 {
     mat_mult* matrix_mult_obj = new mat_mult; 
+    
     int fd[2]; 
     pipe(fd); 
     srand(time(0)); 
@@ -107,6 +113,7 @@ int main()
         if ((pids[1] = fork()) == 0)
         {
             int rtn(0); 
+            string resultant_matrix_str; 
             matrix_mult_obj->init_bias_matrix(); 
             pthread_t threads[NO_THREADS]; 
             for (auto i = 0; i < NO_THREADS; i++)
@@ -130,6 +137,21 @@ int main()
             int n; 
             read(fd[0], &n, sizeof(int)); 
             read(fd[0], read_write_char, sizeof(char)* n); 
+
+            
+            for(auto i = 0;i < 200; i++)
+            {
+                resultant_matrix_str.push_back(read_write_char[i]); 
+
+            }
+            //----------------------------------------------------------------
+            /*Serialized_arr & size_of_serialized_arr
+            PURPOSE: Serialized_arr is a pointer to an integer array which will hold 
+            the resultant matrix calculated by p1 (by multiplication) p1 sent resultant matrix in the form 
+            a string to p2, p2 tokenizes it and stores the values in the string into an integer array*/
+            //----------------------------------------------------------------
+            int size_of_serialized_arr = 0; 
+            int* serialized_arr = tokenizer(resultant_matrix_str, size_of_serialized_arr);
             close(fd[0]);
 
             
@@ -264,9 +286,9 @@ SUMMARY
     rows = 4; 
     coloumns = 4; 
 
-    bias_matrix = new float*[rows]; 
+    bias_matrix = new int*[rows]; 
     for (auto i = 0; i < rows; i++)
-        bias_matrix[i] = new float[coloumns]; 
+        bias_matrix[i] = new int[coloumns]; 
 
     for (auto i = 0; i < rows; i++)
     {
@@ -277,7 +299,7 @@ SUMMARY
     }
 }
 
-void* mat_mult::addition()
+void* mat_mult::addition(int* serialized_arr)
 {
 /*
 SUMMARY 
@@ -331,8 +353,42 @@ SUMMARY
         for(auto j = 0; j < SIZE; j++)
         {
             return_str += to_string(resultant_matrix_mul[i][j]); 
+            
             return_str += " "; 
         }
     }
     strcpy(str, return_str.c_str()); 
+}
+
+int* tokenizer(const string& str, int& size)
+{
+    vector<string> strTok;
+    istringstream ss(str);
+    string deliminiters;
+    while (ss >> deliminiters)
+    {
+        strTok.push_back(deliminiters);
+    }
+
+    int* arr = new int[strTok.size()]; 
+    int count(0); 
+    bool is_ok = false; 
+    for (auto i = 0; i < strTok.size(); i++)
+    {
+        string str = strTok[i]; 
+        try 
+        {
+            arr[i] = stoi(str); 
+
+        }
+        catch(exception &err)
+        {
+            size = count; 
+            return arr; 
+        }
+        cout << arr[i] << endl; 
+        count++; 
+    }
+
+   
 }
