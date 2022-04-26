@@ -27,13 +27,15 @@ public:
     int resultant_matrix_mul[SIZE][SIZE]; 
     int resultant_matrix_add[SIZE][SIZE]; 
     int** bias_matrix;  
+    int* serialized_arr; 
     int step_for_multiply;
     int step_for_additon; 
+    int count; 
 
     mat_mult(); //constructor initiliazes matrix with random values 
     void init_bias_matrix();
     void* multiply();  
-    void* addition(int *); 
+    void* addition(); 
     void print_resultant_matrix_of_mul(); 
     void print_weight_matrix(); 
     void print_xi_matrix();
@@ -70,7 +72,7 @@ int main()
         for (auto i = 0; i < NO_THREADS; i++)
         {
             if (rtn = pthread_create(&threads[i], NULL, (THREADFUNCPTR) &mat_mult::multiply, matrix_mult_obj))
-            {
+            {   
                 fprintf(stderr, "Error: Pthread_create, "); 
                 if (rtn == EAGAIN)
                     fprintf(stderr, "Insufficient resources "); 
@@ -78,10 +80,11 @@ int main()
                     fprintf (stderr, "Invalid Arguments"); 
                 exit(1); 
             }
+           
         }
 
         for (auto& exit: threads)
-        {
+        {  
             pthread_join(exit, NULL); 
         }
 
@@ -112,26 +115,13 @@ int main()
         //-----------Representing P2------------
         if ((pids[1] = fork()) == 0)
         {
+            mat_mult* matrix_add = new mat_mult; 
+
             int rtn(0); 
             string resultant_matrix_str; 
-            matrix_mult_obj->init_bias_matrix(); 
+            matrix_add->init_bias_matrix(); 
             pthread_t threads[NO_THREADS]; 
-            for (auto i = 0; i < NO_THREADS; i++)
-            {
-                if (rtn = pthread_create(&threads[i], NULL, (THREADFUNCPTR) &mat_mult::addition, matrix_mult_obj))
-                {
-                    fprintf(stderr, "Error: Pthread_create, "); 
-                    if (rtn == EAGAIN)
-                        fprintf(stderr, "Insufficient resources "); 
-                    else if(rtn == EINVAL)
-                        fprintf (stderr, "Invalid Arguments"); 
-                    exit(1); 
-                }
-            }
-            for (auto& exit:threads)
-                pthread_join(exit, NULL); 
 
-             
             char read_write_char[200]; 
             close(fd[1]);
             int n; 
@@ -151,17 +141,39 @@ int main()
             a string to p2, p2 tokenizes it and stores the values in the string into an integer array*/
             //----------------------------------------------------------------
             int size_of_serialized_arr = 0; 
-            int* serialized_arr = tokenizer(resultant_matrix_str, size_of_serialized_arr);
+            matrix_add->serialized_arr = NULL; 
+            matrix_add->serialized_arr = tokenizer(resultant_matrix_str, size_of_serialized_arr);
+            for(auto i = 0; i < 16; i++)
+            {
+                cout<< "here " << matrix_add->serialized_arr[i] << endl; 
+            }
             close(fd[0]);
 
+            for (auto i = 0; i < NO_THREADS; i++)
+            {
+                if (rtn = pthread_create(&threads[i], NULL, (THREADFUNCPTR) &mat_mult::addition, matrix_add))
+                {
+                    fprintf(stderr, "Error: Pthread_create, "); 
+                    if (rtn == EAGAIN)
+                        fprintf(stderr, "Insufficient resources "); 
+                    else if(rtn == EINVAL)
+                        fprintf (stderr, "Invalid Arguments"); 
+                    exit(1); 
+                }
+            }
+            for (auto& exit:threads)
+                pthread_join(exit, NULL); 
+
+             
+            
             
 
             std::cout << "Printing the bias matrix " << std::endl; 
-            matrix_mult_obj->print_bias_matrix(); 
+            matrix_add->print_bias_matrix(); 
             std::cout << std::endl; 
 
             std::cout << "Printing the matrix after addition with Bias Matrix " << std::endl; 
-            matrix_mult_obj->print_resultant_matrix_of_add(); 
+            matrix_add->print_resultant_matrix_of_add(); 
             std::cout << std::endl; 
             exit(0); 
         }
@@ -179,10 +191,13 @@ int main()
 void* mat_mult::multiply()
 {
     pthread_mutex_lock(&global_data_mutex);
+    cout << "Thread ID = " << pthread_self() << " Entering" << endl;  
+
     int i = step_for_multiply++; 
     for (int j = 0; j < SIZE; j++)
       for (int k = 0; k < SIZE; k++)
         resultant_matrix_mul[i][j] += weight_matrix[i][k] * x_i_matrix[k][j];
+    cout << "Thread ID = " << pthread_self() << " leaving" << endl;  
     pthread_mutex_unlock(&global_data_mutex);
 }
 
@@ -218,6 +233,8 @@ SUMMARY
 */
     step_for_multiply = 0; 
     step_for_additon = 0; 
+    serialized_arr = nullptr;
+    count = 0; 
     for (int i = 0; i < SIZE; i++) 
     {
         for (int j = 0; j < SIZE; j++) 
@@ -299,7 +316,7 @@ SUMMARY
     }
 }
 
-void* mat_mult::addition(int* serialized_arr)
+void* mat_mult::addition()
 {
 /*
 SUMMARY 
@@ -309,11 +326,16 @@ SUMMARY
     per each row
 </>
 */
-
+    pthread_mutex_lock(&global_data_mutex);
     int i = step_for_additon++; 
+    int count(0); 
         for (auto k = 0; k < SIZE; k++)
-            resultant_matrix_add[i][k] = bias_matrix[i][k] + resultant_matrix_mul[i][k]; 
-
+        {
+           resultant_matrix_add[i][k] = bias_matrix[i][k] + serialized_arr[count];
+           cout << "Added value inside Addition function "<< serialized_arr[count]<< endl;  
+           count++; 
+        }
+    pthread_mutex_unlock(&global_data_mutex);
 }
 
 void mat_mult::print_resultant_matrix_of_add()
@@ -362,6 +384,7 @@ SUMMARY
 
 int* tokenizer(const string& str, int& size)
 {
+    cout << "Entered Tokenizer" << endl; 
     vector<string> strTok;
     istringstream ss(str);
     string deliminiters;
@@ -388,7 +411,8 @@ int* tokenizer(const string& str, int& size)
         }
         cout << arr[i] << endl; 
         count++; 
+        
     }
-
+    return arr; 
    
 }
