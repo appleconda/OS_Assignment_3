@@ -143,10 +143,7 @@ int main()
             int size_of_serialized_arr = 0; 
             matrix_add->serialized_arr = NULL; 
             matrix_add->serialized_arr = tokenizer(resultant_matrix_str, size_of_serialized_arr);
-            for(auto i = 0; i < 16; i++)
-            {
-                cout<< "here " << matrix_add->serialized_arr[i] << endl; 
-            }
+
             close(fd[0]);
 
             for (auto i = 0; i < NO_THREADS; i++)
@@ -172,7 +169,7 @@ int main()
             matrix_add->print_bias_matrix(); 
             std::cout << std::endl; 
 
-            std::cout << "Printing the matrix after addition with Bias Matrix " << std::endl; 
+            
             matrix_add->print_resultant_matrix_of_add(); 
             std::cout << std::endl; 
             exit(0); 
@@ -190,15 +187,15 @@ int main()
 
 void* mat_mult::multiply()
 {
-    pthread_mutex_lock(&global_data_mutex);
-    cout << "Thread ID = " << pthread_self() << " Entering" << endl;  
+    //pthread_mutex_lock(&global_data_mutex);
+    
 
     int i = step_for_multiply++; 
     for (int j = 0; j < SIZE; j++)
       for (int k = 0; k < SIZE; k++)
         resultant_matrix_mul[i][j] += weight_matrix[i][k] * x_i_matrix[k][j];
-    cout << "Thread ID = " << pthread_self() << " leaving" << endl;  
-    pthread_mutex_unlock(&global_data_mutex);
+    
+    //pthread_mutex_unlock(&global_data_mutex);
 }
 
 void mat_mult::print_resultant_matrix_of_mul()
@@ -326,16 +323,15 @@ SUMMARY
     per each row
 </>
 */
-    pthread_mutex_lock(&global_data_mutex);
+    //pthread_mutex_lock(&global_data_mutex);
     int i = step_for_additon++; 
-    int count(0); 
         for (auto k = 0; k < SIZE; k++)
         {
            resultant_matrix_add[i][k] = bias_matrix[i][k] + serialized_arr[count];
-           cout << "Added value inside Addition function "<< serialized_arr[count]<< endl;  
+        
            count++; 
         }
-    pthread_mutex_unlock(&global_data_mutex);
+    //pthread_mutex_unlock(&global_data_mutex);
 }
 
 void mat_mult::print_resultant_matrix_of_add()
