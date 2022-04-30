@@ -5,6 +5,7 @@
 #include <iostream> 
 #include <random> 
 #include <ctime>
+#include <cmath>
 #include <sstream> 
 #include <sys/shm.h>
 #include <sys/wait.h>
@@ -218,8 +219,13 @@ int main()
                 int size_arr; 
                 int* result_from_p2 = tokenizer(temp, size_arr); 
 
-                for (auto i = 0;i < size_arr; i++)
-                    cout << result_from_p2[i] << endl ;
+                int x = 0; 
+                for (auto i = 0; i < 16; i++)
+                {
+                    x = 1/(1+exp(-result_from_p2[i])); 
+                    cout << x << endl ;
+                }
+                
 
 
                 exit(0); 
