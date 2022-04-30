@@ -6,9 +6,14 @@
 #include <random> 
 #include <ctime>
 #include <sstream> 
+#include <sys/shm.h>
 #include <sys/wait.h>
 #include <vector> 
 #include <cstring>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
 
 using namespace std; 
 #define SIZE 4
@@ -42,6 +47,7 @@ public:
     void print_resultant_matrix_of_add(); 
     void print_bias_matrix(); 
     void serialize_resultant_matrix_mul(char str[200]); 
+    void serialize_resultant_matrix_add(char str[200]); 
 };
 
 
@@ -50,7 +56,10 @@ int main()
 {
     mat_mult* matrix_mult_obj = new mat_mult; 
     
+
     int fd[2]; 
+    int fd1[2]; 
+    pipe(fd1); 
     pipe(fd); 
     srand(time(0)); 
     pid_t pids[3]; //for P1, P2, P3
@@ -124,7 +133,7 @@ int main()
 
             char read_write_char[200]; 
             close(fd[1]);
-            int n; 
+            int n;  
             read(fd[0], &n, sizeof(int)); 
             read(fd[0], read_write_char, sizeof(char)* n); 
 
@@ -162,21 +171,65 @@ int main()
                 pthread_join(exit, NULL); 
 
              
-            
-            
 
             std::cout << "Printing the bias matrix " << std::endl; 
             matrix_add->print_bias_matrix(); 
             std::cout << std::endl; 
-
-            
+            for (auto i = 0; i < SIZE; i++)
+            {
+                for(auto j = 0; j < SIZE; j++)
+                {
+                    matrix_add->resultant_matrix_add[i][j]; 
+                }
+            }
+            cout << "Printing result after addition of bias matrix and resultant matrix of multiplication from P1 " << endl;             
             matrix_add->print_resultant_matrix_of_add(); 
             std::cout << std::endl; 
+
+
+            char serialize_resultant_add[200]; 
+            matrix_add->serialize_resultant_matrix_add(serialize_resultant_add); 
+            
+            close(fd1[0]); 
+            serialize_resultant_add[strlen(serialize_resultant_add) - 1] = '\0';
+            n  = strlen(serialize_resultant_add) + 1; 
+            write(fd1[1], &n, sizeof(int));  
+            write(fd1[1], serialize_resultant_add, sizeof(char) *n); 
+            close(fd1[1]); 
             exit(0); 
         }
         else
         {
             wait(NULL); 
+            if((pids[2] = fork()) == 0)
+            {
+                char read_write_char[200]; 
+                close(fd1[1]);
+                int n;  
+                read(fd1[0], &n, sizeof(int)); 
+                read(fd1[0], read_write_char, sizeof(char)* n); 
+                close(fd1[0]); 
+                
+                string temp; 
+                for(auto i= 0;i < 200; i++)
+                {
+                    temp.push_back(read_write_char[i]);  
+                }
+                int size_arr; 
+                int* result_from_p2 = tokenizer(temp, size_arr); 
+
+                for (auto i = 0;i < size_arr; i++)
+                    cout << result_from_p2[i] << endl ;
+
+
+                exit(0); 
+
+            }
+            else 
+            {
+
+                wait(NULL); 
+            }
         }
 
     }   
@@ -378,9 +431,32 @@ SUMMARY
     strcpy(str, return_str.c_str()); 
 }
 
-int* tokenizer(const string& str, int& size)
+void mat_mult::serialize_resultant_matrix_add(char str[200])
 {
-    cout << "Entered Tokenizer" << endl; 
+/*
+SUMMARY 
+    Function of the class: mat_mult
+    PURPOSE: This funciton is used in the child process p1 (where multiplication of
+    weight matrix and xi matrix happens). Now when the child process works on a instance 
+    of the class object mat_mult after exiting all the values that it updated in the instance are destroyed
+    so i have to use pipes to serialize the resultant matrix calculated with that process 
+    convert into string and send via pipe so p2 can read it and use it. 
+*/
+    string return_str; 
+    for (auto i =0; i < SIZE; i++)
+    {
+        for(auto j = 0; j < SIZE; j++)
+        {
+            return_str += to_string(resultant_matrix_add[i][j]); 
+            
+            return_str += " "; 
+        }
+    }
+    strcpy(str, return_str.c_str()); 
+}
+
+int* tokenizer(const string& str, int& size)    
+{
     vector<string> strTok;
     istringstream ss(str);
     string deliminiters;
@@ -405,7 +481,7 @@ int* tokenizer(const string& str, int& size)
             size = count; 
             return arr; 
         }
-        cout << arr[i] << endl; 
+        
         count++; 
         
     }
