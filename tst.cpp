@@ -4,9 +4,13 @@
 #include <vector> 
 #include <sstream>
 #include <queue> 
+#include <stdlib.h>
 #include <pthread.h>
 #include <cmath>
+#include <iomanip>
+#include <chrono>
 #include <math.h>
+#include <time.h> 
 using namespace std; 
 
 typedef void* (*THREADFUNCPTR) (void* ); 
@@ -20,11 +24,14 @@ public:
     int unit_count;
 	int* task_value_arr; 
     int *unitIdList;
+	time_t start, end; 
+	double timeTaken; 
 
 	task() 
 	{ id = 0; task_value = 0; arrival_time = 0; unit_count = 0; unitIdList = NULL; task_value_arr = NULL;}
 	void* work_thread1()
 	{
+		clock_t begin = clock(); 
 		for (auto i = 0; i < unit_count; i++)
 		{
 			if (unitIdList[i] == 0)
@@ -58,15 +65,17 @@ public:
 				task_value_arr[i] = sqrt(task_value_arr[i]);
 			}
 		}
+		clock_t end = clock(); 
+		timeTaken = (double)(end - begin); 
+		
 	}
 	void* work_thread()
 	{
 		pthread_t threads[unit_count]; 
 		int rtn; 
-		cout << "inside thread" << task_value << endl; 
 		for (auto i = 0; i < unit_count; i++)
 		{
-		
+			
 			if (rtn = pthread_create(&threads[i], NULL, (THREADFUNCPTR) &task::work_thread1, this))
 			{   
 				fprintf(stderr, "Error: Pthread_create, "); 
@@ -141,7 +150,6 @@ int main()
 	string line = "";
 
 	getline(fout, line); 
-	cout <<	line << endl; 
 
 	vector<string> row_data;
 	string temp = "";
@@ -153,7 +161,6 @@ int main()
 	int number_of_lines = 0; 
 	for (auto i : row_data)
 	{
-		cout << i << endl ;
 		number_of_lines++;
 	}
 	
@@ -178,8 +185,8 @@ int main()
 		my_task[i] = &tasks[i] ;
 	}
 	
-	
-
+	cout << endl << endl; 
+	cout << "Starting " << number_of_lines << " threads to cater for every structure" << endl << endl; 
 	for (auto i = 0; i < number_of_lines; i++)
 	{
 		
@@ -198,5 +205,28 @@ int main()
 	for (auto& exit : pids)
 		pthread_join(exit, NULL); 
 
-	cout << my_task[0]->task_value_arr[0] << endl; 
+	//system("CLS"); 
+
+	for (auto i = 0;i < number_of_lines; i++)
+	{
+		cout << "-------------------------------------" << endl; 
+		cout << "Task ID = " << my_task[i]->id << endl; 
+		cout << "Completion time = " << my_task[i]->timeTaken << endl; 
+		for (auto j = 0; j < my_task[i]->unit_count; j++)
+			cout << "Unit IDs = " << my_task[i]->unitIdList[j] << ",";
+		cout << endl; 
+		cout << "Following are the task Values : " << endl ;
+		cout << left << setw(10) << "Value#1 "
+		 << left << setw(10) << "Value #2 "
+		  << left << setw(10) << "Value#3 "
+		   << left << setw(10) << "Value#4 "
+		    << left << setw(10) << "Value#5 " << endl; 
+		for (auto j = 0; j < my_task[i]->unit_count; j++)
+		{
+			cout << left << setw(10) << my_task[i]->task_value_arr[j]; 
+		}
+		cout << endl; 
+
+	}
+
 }
